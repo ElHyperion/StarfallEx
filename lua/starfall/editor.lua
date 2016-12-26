@@ -22,11 +22,11 @@ if CLIENT then
 
 	-- Colors
 	SF.Editor.colors = {}
-	SF.Editor.colors.dark 		= Color( 36, 41, 53 )
-	SF.Editor.colors.meddark 	= Color( 48, 57, 92 )
-	SF.Editor.colors.med 		= Color( 78, 122, 199 )
+	SF.Editor.colors.dark 		= Color( 0, 15, 32 )
+	SF.Editor.colors.meddark 	= Color( 15, 20, 45 )
+	SF.Editor.colors.med 		= Color( 25, 50, 120 )
 	SF.Editor.colors.medlight 	= Color( 127, 178, 240 )
-	SF.Editor.colors.light 		= Color( 173, 213, 247 )
+	SF.Editor.colors.light 		= Color( 150, 190, 210)
 
 	-- Icons
 	SF.Editor.icons = {}
