@@ -123,15 +123,16 @@ function weapon_methods:lastShootTime ()
 	return ent:LastShootTime()
 end
 
+--- Gets Display name of weapon
+-- @client
+-- @return string Display name of weapon
+function weapon_methods:getPrintName ()
+	SF.CheckType( self, weapon_metamethods )
+	local ent = SF.Entities.Unwrap( self )
+	return ent:GetPrintName()
+end
+
 if CLIENT then
-	--- Gets Display name of weapon
-	-- @client
-	-- @return string Display name of weapon
-	function weapon_methods:getPrintName ()
-		SF.CheckType( self, weapon_metamethods )
-		local ent = SF.Entities.Unwrap( self )
-		return ent:GetPrintName()
-	end
 	
 	--- Returns if the weapon is carried by the local player. 
 	-- @client
