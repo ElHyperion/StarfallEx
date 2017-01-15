@@ -3,25 +3,11 @@
 -- Functions built-in to the default environment
 -------------------------------------------------------------------------------
 
-local dgetmeta = debug.getmetatable
-
 --- Built in values. These don't need to be loaded; they are in the default environment.
 -- @name builtin
 -- @shared
 -- @class library
 -- @libtbl SF.DefaultEnvironment
-
--- ------------------------- Lua Ports ------------------------- --
--- This part is messy because of LuaDoc stuff.
-
-local function pascalToCamel ( t, r )
-	local r = r or {}
-	for k, v in pairs( t ) do
-		k = k:gsub( "^%l", string.lower )
-		r[ k ] = v
-	end
-	return r
-end
 
 --- Returns the entity representing a processor that this script is running on.
 -- @name SF.DefaultEnvironment.chip
@@ -234,6 +220,26 @@ function SF.DefaultEnvironment.getLibraries()
 end
 
 
+local luaTypes = {
+	nil,
+	true,
+	0,
+	function() end,
+	coroutine.create(function() end)
+}
+for i=1, 5 do
+	local luaType = luaTypes[i]
+	local meta = debug.getmetatable(luaType)
+	if meta then
+		SF.Libraries.AddHook( "prepare", function()
+			debug.setmetatable( luaType, nil )
+		end )
+		SF.Libraries.AddHook( "cleanup", function() 
+			debug.setmetatable( luaType, meta )
+		end )
+	end
+end
+
 
 if CLIENT then	
 	--- Sets the chip's display name
@@ -435,6 +441,8 @@ function SF.DefaultEnvironment.try ( func, catch )
 		if err.uncatchable then
 			error( err )
 		end
+	elseif err == "not enough memory" then
+		SF.throw( err, 0, true )
 	end
 	if catch then catch( err ) end
 end

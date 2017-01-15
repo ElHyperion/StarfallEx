@@ -1,5 +1,7 @@
 SF.Bass = {}
 
+local bassEnabled = CreateConVar( "sf_bass_enabled", "1", { FCVAR_ARCHIVE },
+	"Whether or not you can hear bass sounds from starfall chips" )
 --- Bass type
 -- @client
 local bass_methods, bass_metamethods = SF.Typedef( "Bass" )
@@ -51,6 +53,15 @@ function bass_library.loadFile ( path, flags, callback )
 	
 	local instance = SF.instance
 
+	if not bassEnabled:GetBool() then
+		local ok, msg, traceback = instance:runFunction( callback, nil, -1, "sf_bass_enabled is 0" )
+		if not ok then
+			instance:Error( msg, traceback )
+		end
+
+		return
+	end
+
 	sound.PlayFile( path, flags, function(snd, er, name)
 		if er then
 			local ok, msg, traceback = instance:runFunction( callback, nil, er, name )
@@ -71,7 +82,7 @@ function bass_library.loadFile ( path, flags, callback )
 	end)
 end
 
---- Loads a sound object from a url. Doesn't work on Linux users
+--- Loads a sound object from a url
 -- @param path url to the sound file.
 -- @param flags that will control the sound
 -- @param callback to run when the sound is loaded
@@ -83,18 +94,15 @@ function bass_library.loadURL ( path, flags, callback )
 	SF.CheckType( callback, "function" )
 
 	local instance = SF.instance
-	
-	-- sound.PlayURL crashes users with Linux as OS
-	-- therefore the callback gets called with error code -1 (unknown), nil sound and an error message
-	if system.IsLinux() then
-		local ok, msg, traceback = instance:runFunction( callback, nil, -1, "bass.loadURL() does not work on linux users" )
+
+	if not bassEnabled:GetBool() then
+		local ok, msg, traceback = instance:runFunction( callback, nil, -1, "sf_bass_enabled is 0" )
 		if not ok then
 			instance:Error( msg, traceback )
 		end
 
 		return
 	end
-
 
 	sound.PlayURL( path, flags, function(snd, er, name)
 		if er then
