@@ -111,25 +111,6 @@ do
 	SF.DefaultEnvironment = env
 end
 
---- A set of all instances that have been created. It has weak keys and values.
--- Instances are put here after initialization.
-SF.allInstances = setmetatable({},{__mode="kv"})
-
---- Calls a script hook on all processors.
-function SF.RunScriptHook(hook,...)
-	for _,instance in pairs(SF.allInstances) do
-		if not instance.error then
-			local ok, err = instance:runScriptHook(hook,...)
-			if not ok then
-				instance.error = true
-				if instance.runOnError then
-					instance:runOnError( err )
-				end
-			end
-		end
-	end
-end
-
 --- Creates a new context. A context is used to define what scripts will have access to.
 -- @param env The environment metatable to use for the script. Default is SF.DefaultEnvironmentMT
 -- @param directives Additional Preprocessor directives to use. Default is an empty table
@@ -297,6 +278,27 @@ function SF.EntityTable( key )
 	end})
 end
 
+--- Returns a path with all .. accounted for
+function SF.NormalizePath( path )
+	local tbl = string.Explode( "[/\\]+", path, true )
+	if #tbl == 1 then return path end
+	local i = 1
+	while i <= #tbl do
+		if tbl[i] == "." or tbl[i]=="" then
+			table.remove(tbl, i)
+		elseif tbl[i] == ".." then
+			table.remove(tbl, i)
+			if i>1 then
+				table.remove(tbl, i-1)
+			end
+		else
+			i = i + 1
+		end
+	end
+	return table.concat(tbl, "/")
+end
+
+
 --- Returns a class that can keep track of burst
 function SF.BurstObject( rate, max )
 	local burstclass = {
@@ -321,31 +323,6 @@ function SF.BurstObject( rate, max )
 		lasttick = 0
 	}
 	return setmetatable(t, {__index=burstclass})
-end
-
-local wrappedfunctions = setmetatable({},{__mode="kv"})
-local wrappedfunctions2instance = setmetatable({},{__mode="kv"})
---- Wraps the given starfall function so that it may called directly by GMLua
--- @param func The starfall function getting wrapped
--- @param instance The instance the function originated from
--- @return a function That when called will call the wrapped starfall function
-function SF.WrapFunction( func, instance )
-	if wrappedfunctions[func] then return wrappedfunctions[func] end
-	
-	local function returned_func( ... )
-		return SF.Unsanitize( instance:runFunction( func, SF.Sanitize(...) ) )
-	end
-	wrappedfunctions[func] = returned_func
-	wrappedfunctions2instance[returned_func] = instance
-	
-	return returned_func
-end
-
---- Gets the instance a wrapped function is bound to
--- @param func Function
--- @return Instance
-function SF.WrappedFunctionInstance(func)
-	return wrappedfunctions2instance[func]
 end
 
 -- A list of safe data types
@@ -480,6 +457,37 @@ function SF.DeserializeCode(tbl)
 	return sources, tbl.mainfile
 end
 
+local soundsMap = {
+	[ "DRIP1" ] = 0, [0] = "DRIP1",
+	[ "DRIP2" ] = 1,	[1] = "DRIP2",
+	[ "DRIP3" ] = 2,	[2] = "DRIP3",
+	[ "DRIP4" ] = 3,	[3] = "DRIP4",
+	[ "DRIP5" ] = 4,	[4] = "DRIP5",
+	[ "ERROR1" ] = 5,	[5] = "ERROR1",
+	[ "CONFIRM1" ] = 6,	[6] = "CONFIRM1",
+	[ "CONFIRM2" ] = 7,	[7] = "CONFIRM2",
+	[ "CONFIRM3" ] = 8,	[8] = "CONFIRM3",
+	[ "CONFIRM4" ] = 9,	[9] = "CONFIRM4",
+}
+local soundsMapSounds = {
+	[ "DRIP1" ] = "ambient/water/drip1.wav",
+	[ "DRIP2" ] = "ambient/water/drip2.wav",
+	[ "DRIP3" ] = "ambient/water/drip3.wav",
+	[ "DRIP4" ] = "ambient/water/drip4.wav",
+	[ "DRIP5" ] = "ambient/water/drip5.wav",
+	[ "ERROR1" ] = "buttons/button10.wav",
+	[ "CONFIRM1" ] = "buttons/button3.wav",
+	[ "CONFIRM2" ] = "buttons/button14.wav",
+	[ "CONFIRM3" ] = "buttons/button15.wav",
+	[ "CONFIRM4" ] = "buttons/button17.wav"
+}
+local notificationsMap = {
+	["GENERIC"] = 0,
+	["ERROR"] = 1,
+	["UNDO"] = 2,
+	["HINT"] = 3,
+	["CLEANUP"] = 4,
+}
 -- ------------------------------------------------------------------------- --
 
 if SERVER then
@@ -530,7 +538,7 @@ if SERVER then
 
 			net.ReadStream( ply, function( data )
 				if not data and uploaddata[ply]==updata then
-					SF.AddNotify( ply, "There was a problem uploading your code. Try again in a second.", NOTIFY_ERROR, 7, NOTIFYSOUND_ERROR1 )
+					SF.AddNotify( ply, "There was a problem uploading your code. Try again in a second.", "ERROR", 7, "ERROR1" )
 					uploaddata[ply] = nil
 					return
 				end
@@ -557,9 +565,9 @@ if SERVER then
 
 		net.Start( "starfall_addnotify" )
 		net.WriteString( msg )
-		net.WriteUInt( notifyType, 8 or 0, 8 )
+		net.WriteUInt( notificationsMap[ notifyType ], 8 )
 		net.WriteFloat( duration )
-		net.WriteUInt( sound, 8 or 0, 8 )
+		net.WriteUInt( soundsMap[ sound ], 8 )
 		if ply then
 			net.Send( ply )
 		else
@@ -623,23 +631,10 @@ else
 			net.WriteBit(true)
 			net.SendToServer()
 			if list then
-				SF.AddNotify( LocalPlayer(), list, NOTIFY_ERROR, 7, NOTIFYSOUND_ERROR1 )
+				SF.AddNotify( LocalPlayer(), list, "ERROR", 7, "ERROR1" )
 			end
 		end
 	end)
-
-	local sounds = {
-		[ NOTIFYSOUND_DRIP1 ] = "ambient/water/drip1.wav",
-		[ NOTIFYSOUND_DRIP2 ] = "ambient/water/drip2.wav",
-		[ NOTIFYSOUND_DRIP3 ] = "ambient/water/drip3.wav",
-		[ NOTIFYSOUND_DRIP4 ] = "ambient/water/drip4.wav",
-		[ NOTIFYSOUND_DRIP5 ] = "ambient/water/drip5.wav",
-		[ NOTIFYSOUND_ERROR1 ] = "buttons/button10.wav",
-		[ NOTIFYSOUND_CONFIRM1 ] = "buttons/button3.wav",
-		[ NOTIFYSOUND_CONFIRM2 ] = "buttons/button14.wav",
-		[ NOTIFYSOUND_CONFIRM3 ] = "buttons/button15.wav",
-		[ NOTIFYSOUND_CONFIRM4 ] = "buttons/button17.wav"
-	}
 
 	function SF.AddNotify ( ply, msg, type, duration, sound )
 		if not IsValid( ply ) then return end
@@ -656,14 +651,13 @@ else
 		end
 		
 		GAMEMODE:AddNotify( msg, type, duration )
-
-		if sound and sounds[ sound ] then
-			surface.PlaySound( sounds[ sound ] )
+		if sound and soundsMapSounds[ sound ] then
+			surface.PlaySound( soundsMapSounds[ sound ] )
 		end
 	end
 
 	net.Receive( "starfall_addnotify", function ()
-		SF.AddNotify( LocalPlayer(), net.ReadString(), net.ReadUInt( 8 ), net.ReadFloat(), net.ReadUInt( 8 ) )
+		SF.AddNotify( LocalPlayer(), net.ReadString(), net.ReadUInt( 8 ), net.ReadFloat(), soundsMap[ net.ReadUInt( 8 ) ])
 	end )
 
 	net.Receive( "starfall_console_print", function ()

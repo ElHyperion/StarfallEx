@@ -81,6 +81,12 @@ net.Receive("starfall_processor_update_links", function(len, ply)
 end)
 
 function ENT:Compile(files, mainfile)
+	if self.instance then
+		self:runScriptHook( "removed" )
+		self.instance:deinitialize()
+		self.instance = nil
+	end
+	
 	local update = self.mainfile ~= nil
 	self.error = nil
 	self.files = files
@@ -99,14 +105,8 @@ function ENT:Compile(files, mainfile)
 	if instance.ppdata.scriptnames and instance.mainfile and instance.ppdata.scriptnames[ instance.mainfile ] then
 		self.name = tostring( instance.ppdata.scriptnames[ instance.mainfile ] )
 	end
-
+	
 	instance.runOnError = function(inst,...) self:Error(...) end
-
-	if self.instance then
-		self.instance:deinitialize()
-		self.instance = nil
-	end
-
 	self.instance = instance
 	
 	local ok, msg, traceback = instance:initialize()
@@ -116,7 +116,7 @@ function ENT:Compile(files, mainfile)
 	end
 	
 	if not self.instance then return end
-
+	
 	local clr = self:GetColor()
 	self:SetColor( Color( 255, 255, 255, clr.a ) )
 	
@@ -154,7 +154,7 @@ function ENT:PreEntityCopy ()
 	if self.EntityMods then self.EntityMods.SFDupeInfo = nil end
 	
 	if self.instance then
-		local info = WireLib.BuildDupeInfo(self)
+		local info = WireLib and WireLib.BuildDupeInfo(self) or {}
 		info.starfall = SF.SerializeCode( self.files, self.mainfile )
 		duplicator.StoreEntityModifier( self, "SFDupeInfo", info )
 	end
@@ -172,7 +172,9 @@ function ENT:PostEntityPaste ( ply, ent, CreatedEntities )
 	if ent.EntityMods and ent.EntityMods.SFDupeInfo then
 		local info = ent.EntityMods.SFDupeInfo
 		
-		WireLib.ApplyDupeInfo( ply, ent, info, EntityLookup( CreatedEntities ) )
+		if WireLib then
+			WireLib.ApplyDupeInfo( ply, ent, info, EntityLookup( CreatedEntities ) )
+		end
 		self.owner = ply
 	
 		if info.starfall then

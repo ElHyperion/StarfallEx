@@ -9,6 +9,7 @@ local context = SF.CreateContext( nil, nil, nil, SF.Libraries.CreateLocalTbl{"re
 function ENT:Initialize()	
 	self.CPUpercent = 0
 	self.CPUus = 0
+	self.name = "Generic ( No-Name )"
 end
 
 hook.Add("NetworkEntityCreated","starfall_chip_reset",function(ent)
@@ -33,15 +34,21 @@ function ENT:GetOverlayText()
 		serverstr = "Errored"
 	end
 	if serverstr then
-		return "- Starfall Processor -\n[ " .. ( self.name or "Generic ( No-Name )" ) .. " ]\nServer CPU: " .. serverstr .. "\nClient CPU: " .. clientstr
+		return "- Starfall Processor -\n[ " .. self.name .. " ]\nServer CPU: " .. serverstr .. "\nClient CPU: " .. clientstr
 	else
 		return "(None)"
 	end
 end
 
-function ENT:DrawTranslucent()
-	self:DrawModel()
-	Wire_Render( self )
+if WireLib then
+	function ENT:DrawTranslucent()
+		self:DrawModel()
+		Wire_Render( self )
+	end
+else
+	function ENT:DrawTranslucent()
+		self:DrawModel()
+	end
 end
 
 function ENT:Think ()
@@ -62,7 +69,12 @@ end
 
 function ENT:CodeSent ( files, main, owner )
 	if not files or not main or not owner then return end
-	if self.instance then self.instance:deinitialize() end
+	if self.instance then
+		self:runScriptHook( "removed" )
+		self.instance:deinitialize()
+		self.instance = nil
+	end
+	
 	self.error = nil
 	self.owner = owner
 	self.files = files
@@ -70,8 +82,11 @@ function ENT:CodeSent ( files, main, owner )
 	local ok, instance = SF.Compiler.Compile( files, context, main, owner, { entity = self, render = {} } )
 	if not ok then self:Error( instance ) return end
 	
-	if instance.ppdata.scriptnames and instance.mainfile and instance.ppdata.scriptnames[ instance.mainfile ] then
-		self.name = tostring( instance.ppdata.scriptnames[ instance.mainfile ] )
+	if instance.ppdata.scriptnames and instance.mainfile then
+		local name = instance.ppdata.scriptnames[ instance.mainfile ]
+		if name and name~="" then
+			self.name = name
+		end
 	end
 	
 	instance.runOnError = function ( inst, ... ) self:Error( ... ) end
